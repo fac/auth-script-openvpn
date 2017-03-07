@@ -1,22 +1,26 @@
-// Required to use strdup on SmartOS
+/*
+  auth-script OpenVPN plugin
+
+  Runs an external script to decide whether to authenticate a user or not.
+  Useful for checking 2FA on VPN auth attempts as it doesn't block the main
+  openvpn process, unlike passing the script to --auth-user-pass-verify.
+
+  Functions required to be a valid OpenVPN plugin:
+  * openvpn_plugin_open_v3
+  * openvpn_plugin_func_v3
+  * openvpn_plugin_close_v1
+
+*/
+
+// Required to use strdup
 #define __EXTENSIONS__
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
 #include "openvpn-plugin.h"
 
-/*
-  Expect OpenVPN v3 Plugin API
-
-  Functions we MUST define:
-    * openvpn_plugin_open_v3
-    * openvpn_plugin_func_v3
-    * openvpn_plugin_close_v1
-
-*/
-
+// For consistency in log messages
 #define PLUGIN_NAME "auth-script"
 
 // Where we store our own settings/state
