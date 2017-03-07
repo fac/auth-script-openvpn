@@ -15,6 +15,7 @@
 // Required to use strdup
 #define __EXTENSIONS__
 
+#include <errno.h>
 #include <openvpn-plugin.h>
 #include <signal.h>
 #include <stdio.h>
@@ -73,7 +74,10 @@ deferred_handler(struct plugin_context *context,
     return OPENVPN_PLUGIN_FUNC_DEFERRED;
   }
 
-  execve(argv[0], &argv[0], (char *const*)envp);
+  int execret = execve(argv[0], &argv[0], (char *const*)envp);
+  if (-1 == execret) {
+    log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec. errno: %d", errno);
+  }
   exit(127);
 }
 
