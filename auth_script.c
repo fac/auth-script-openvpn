@@ -1,0 +1,127 @@
+// Required to use strdup on SmartOS
+#define __EXTENSIONS__
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "openvpn-plugin.h"
+
+/*
+  Expect OpenVPN v3 Plugin API
+
+  Functions we MUST define:
+    * openvpn_plugin_open_v3
+    * openvpn_plugin_func_v3
+    * openvpn_plugin_close_v1
+
+*/
+
+#define PLUGIN_NAME "auth-script"
+
+// Where we store our own settings/state
+struct plugin_context {
+  const char *script_path;
+  plugin_log_t plugin_log;
+};
+
+// void handle_sigchld(int sig)
+// {
+//     while(waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+// }
+
+static int
+deferred_handler(const char *script_path,
+                 const char *argv[],
+                 const char *envp[])
+{
+  
+
+  return OPENVPN_PLUGIN_FUNC_SUCCESS;
+}
+
+// We require OpenVPN Plugin API v3
+OPENVPN_EXPORT int
+openvpn_plugin_min_version_required_v1()
+{
+  return 3;
+}
+
+// Handle plugin initialization
+//    arguments->argv[0] is path to shared lib
+//    arguments->argv[1] is expected to be path to script
+OPENVPN_EXPORT int
+openvpn_plugin_open_v3(const int struct_version,
+                       struct openvpn_plugin_args_open_in const *arguments,
+                       struct openvpn_plugin_args_open_return *retptr)
+{
+  plugin_log_t log = arguments->callbacks->plugin_log;
+  log(PLOG_DEBUG, PLUGIN_NAME, "FUNC: openvpn_plugin_open_v3");
+
+  struct plugin_context *context = NULL;
+
+  // Safeguard on openvpn versions
+  if (struct_version < OPENVPN_PLUGINv3_STRUCTVER) {
+    log(PLOG_ERR, PLUGIN_NAME, "ERROR: struct version was older than required");
+    return OPENVPN_PLUGIN_FUNC_ERROR;
+  }
+
+  // Tell OpenVPN we want to handle these calls
+  retptr->type_mask = OPENVPN_PLUGIN_MASK(OPENVPN_PLUGIN_AUTH_USER_PASS_VERIFY);
+
+  // Plugin init will fail unless we create a handler, so we'll store our
+  // script path there as we have to create it anyway.
+  context = (struct plugin_context *) calloc(1, sizeof(struct plugin_context));
+
+  context->plugin_log = log;
+
+  // Check we've been handed a script path to call
+  // This comes directly from openvpn config file:
+  //      plugin /path/to/auth.so /path/to/auth/script.sh
+  if (arguments->argv[1]) {
+    context->script_path = strdup(arguments->argv[1]);
+    log(PLOG_DEBUG, PLUGIN_NAME, "script_path=%s", context->script_path);
+  } else {
+    log(PLOG_ERR, PLUGIN_NAME, "ERROR: no script_path specified in config file");
+    return OPENVPN_PLUGIN_FUNC_ERROR;
+  }
+
+  // Pass state back to OpenVPN so we get handed it back later
+  retptr->handle = (openvpn_plugin_handle_t) context;
+
+  log(PLOG_DEBUG, PLUGIN_NAME, "plugin initialized successfully");
+
+  return OPENVPN_PLUGIN_FUNC_SUCCESS;
+}
+
+// Called when we need to handle OPENVPN_PLUGIN_AUTH_USER_PASS_VERIFY calls
+OPENVPN_EXPORT int
+openvpn_plugin_func_v3(const int struct_version,
+                       struct openvpn_plugin_args_func_in const *arguments,
+                       struct openvpn_plugin_args_func_return *retptr)
+{
+  struct plugin_context *context = (struct plugin_context *) arguments->handle;
+  plugin_log_t log = context->plugin_log;
+
+  log(PLOG_DEBUG, PLUGIN_NAME, "FUNC: openvpn_plugin_func_v3");
+
+  // Safeguard on openvpn versions
+  if (struct_version < OPENVPN_PLUGINv3_STRUCTVER) {
+    log(PLOG_ERR, PLUGIN_NAME, "ERROR: struct version was older than required");
+    return OPENVPN_PLUGIN_FUNC_ERROR;
+  }
+
+  if(arguments->type == OPENVPN_PLUGIN_AUTH_USER_PASS_VERIFY) {
+    log(PLOG_DEBUG, PLUGIN_NAME, "Handling auth with deferred script");
+    return deferred_handler(context->script_path, arguments->argv, arguments->envp);
+  } else {
+    return OPENVPN_PLUGIN_FUNC_SUCCESS;
+  }
+}
+
+OPENVPN_EXPORT void
+openvpn_plugin_close_v1(openvpn_plugin_handle_t handle)
+{
+  struct plugin_context *context = (struct plugin_context *) handle;
+  free(context);
+}
