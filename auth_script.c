@@ -15,10 +15,12 @@
 // Required to use strdup
 #define __EXTENSIONS__
 
+#include <openvpn-plugin.h>
+#include <signal.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-#include "openvpn-plugin.h"
+#include <string.h>
+#include <unistd.h>
 
 // For consistency in log messages
 #define PLUGIN_NAME "auth-script"
@@ -29,19 +31,50 @@ struct plugin_context {
   plugin_log_t plugin_log;
 };
 
-// void handle_sigchld(int sig)
-// {
-//     while(waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
-// }
+void handle_sigchld(int sig)
+{
+  (void)sig; // Squish -Wunused-parameter warning
 
+  while(waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
+}
+
+// Handle an authentication request
 static int
-deferred_handler(const char *script_path,
-                 const char *argv[],
+deferred_handler(struct plugin_context *context,
                  const char *envp[])
 {
-  
+  plugin_log_t log = context->plugin_log;
 
-  return OPENVPN_PLUGIN_FUNC_SUCCESS;
+  int pid;
+  struct sigaction sa;
+  char *script_path = strdup(context->script_path);
+  char *argv[] = {script_path, 0};
+
+  log(PLOG_DEBUG, PLUGIN_NAME, "Deferred handler using script_path=%s", script_path);
+
+  sa.sa_handler = &handle_sigchld;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+
+  if (sigaction(SIGCHLD, &sa, 0) == -1) {
+    log(PLOG_ERR, PLUGIN_NAME, "sigaction call failed");
+    return OPENVPN_PLUGIN_FUNC_ERROR;
+  }
+
+  pid = fork();
+
+  if (pid < 0) {
+    log(PLOG_ERR, PLUGIN_NAME, "pid failed < 0 check, got %d", pid);
+    return OPENVPN_PLUGIN_FUNC_ERROR;
+  }
+
+  if (pid > 0) {
+    log(PLOG_DEBUG, PLUGIN_NAME, "child pid is %d", pid);
+    return OPENVPN_PLUGIN_FUNC_DEFERRED;
+  }
+
+  execve(argv[0], &argv[0], (char *const*)envp);
+  exit(127);
 }
 
 // We require OpenVPN Plugin API v3
@@ -104,6 +137,7 @@ openvpn_plugin_func_v3(const int struct_version,
                        struct openvpn_plugin_args_func_in const *arguments,
                        struct openvpn_plugin_args_func_return *retptr)
 {
+  (void)retptr; // Squish -Wunused-parameter warning
   struct plugin_context *context = (struct plugin_context *) arguments->handle;
   plugin_log_t log = context->plugin_log;
 
@@ -117,7 +151,7 @@ openvpn_plugin_func_v3(const int struct_version,
 
   if(arguments->type == OPENVPN_PLUGIN_AUTH_USER_PASS_VERIFY) {
     log(PLOG_DEBUG, PLUGIN_NAME, "Handling auth with deferred script");
-    return deferred_handler(context->script_path, arguments->argv, arguments->envp);
+    return deferred_handler(context, arguments->envp);
   } else {
     return OPENVPN_PLUGIN_FUNC_SUCCESS;
   }
