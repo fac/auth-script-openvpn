@@ -1,5 +1,5 @@
 CC		:= gcc
-CFLAGS	:= -std=c99
+CFLAGS	:= -std=c99 -Wall -Wextra
 LDFLAGS	:= -fPIC -shared
 
 all: plugin
