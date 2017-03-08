@@ -76,7 +76,52 @@ deferred_handler(struct plugin_context *context,
 
   int execret = execve(argv[0], &argv[0], (char *const*)envp);
   if (-1 == execret) {
-    log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec. errno: %d", errno);
+    switch(errno) {
+      case E2BIG:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: E2BIG");
+        break;
+      case EACCES:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: EACCES");
+        break;
+      case EAGAIN:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: EAGAIN");
+        break;
+      case EFAULT:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: EFAULT");
+        break;
+      case EINTR:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: EINTR");
+        break;
+      case EINVAL:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: EINVAL");
+        break;
+      case ELOOP:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ELOOP");
+        break;
+      case ENAMETOOLONG:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ENAMETOOLONG");
+        break;
+      case ENOENT:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ENOENT");
+        break;
+      case ENOEXEC:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ENOEXEC");
+        break;
+      case ENOLINK:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ENOLINK");
+        break;
+      case ENOMEM:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ENOMEM");
+        break;
+      case ENOTDIR:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ENOTDIR");
+        break;
+      case ETXTBSY:
+        log(PLOG_DEBUG, PLUGIN_NAME, "Error trying to exec: ETXTBSY");
+        break;
+      default:
+        log(PLOG_ERR, PLUGIN_NAME, "Error trying to exec: unknown, errno: %d", errno);
+    }
   }
   exit(127);
 }
