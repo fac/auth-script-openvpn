@@ -66,11 +66,13 @@ deferred_handler(struct plugin_context *context,
 
   if (pid < 0) {
     log(PLOG_ERR, PLUGIN_NAME, "pid failed < 0 check, got %d", pid);
+    free(script_path);
     return OPENVPN_PLUGIN_FUNC_ERROR;
   }
 
   if (pid > 0) {
     log(PLOG_DEBUG, PLUGIN_NAME, "child pid is %d", pid);
+    free(script_path);
     return OPENVPN_PLUGIN_FUNC_DEFERRED;
   }
 
