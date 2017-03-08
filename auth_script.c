@@ -59,23 +59,27 @@ deferred_handler(struct plugin_context *context,
 
   if (sigaction(SIGCHLD, &sa, 0) == -1) {
     log(PLOG_ERR, PLUGIN_NAME, "sigaction call failed");
+    free(script_path);
     return OPENVPN_PLUGIN_FUNC_ERROR;
   }
 
   pid = fork();
 
   if (pid < 0) {
+    // parent process, child failed to fork
     log(PLOG_ERR, PLUGIN_NAME, "pid failed < 0 check, got %d", pid);
     free(script_path);
     return OPENVPN_PLUGIN_FUNC_ERROR;
   }
 
   if (pid > 0) {
+    // parent process, child forked successfully
     log(PLOG_DEBUG, PLUGIN_NAME, "child pid is %d", pid);
     free(script_path);
     return OPENVPN_PLUGIN_FUNC_DEFERRED;
   }
 
+  // child process
   int execret = execve(argv[0], &argv[0], (char *const*)envp);
   if (-1 == execret) {
     switch(errno) {
@@ -125,6 +129,7 @@ deferred_handler(struct plugin_context *context,
         log(PLOG_ERR, PLUGIN_NAME, "Error trying to exec: unknown, errno: %d", errno);
     }
   }
+  free(script_path);
   exit(127);
 }
 
