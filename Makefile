@@ -1,6 +1,6 @@
-CC		:= gcc
-CFLAGS	:= -std=c99
-LDFLAGS	:= -fPIC -shared
+CC := gcc
+CFLAGS := -std=c99 -Wall -Wextra -Wformat-security -fstack-protector-strong -D_FORTIFY_SOURCE=2
+LDFLAGS := -fPIC -shared
 
 all: plugin
 

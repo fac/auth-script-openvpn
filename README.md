@@ -59,6 +59,12 @@ Example env the script is called in:
     username=a
     verb=9
 
+### Static Challenge
+
+If you're using `static-challenge`, you might wonder where the response value is in the env hash. See the OpenVPN management-notes docs for more info, but it's passed as part of the password.
+
+The format in the env password value is `SCRV1:<BASE64_PASSWORD>:<BASE64_RESPONSE>`
+
 ## License
 
 See LICENSE.
