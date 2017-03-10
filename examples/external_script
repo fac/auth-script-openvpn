@@ -1,0 +1,35 @@
+#!/opt/local/bin/ruby
+
+AUTH_SUCCESS = "1"
+AUTH_FAILURE = "0"
+
+def respond_with(value, control_path = ENV["auth_control_file"])
+  File.open(control_path, "w+") do |f|
+    f.puts(value)
+  end
+  exit 0
+end
+
+username = ENV["username"]
+password = ENV["password"]
+
+if password.start_with?("SCRV1")
+  # static-challenge password, need to do some more work
+  require "base64"
+
+  # SCRV1:<b64 password>:<b64 response>
+  _, password, challenge_response = password.split(":", 3)
+  password = Base64.decode64(password)
+  challenge_response = Base64.decode64(challenge_response)
+end
+
+if username == "root" && password == "root"
+  if defined?(challenge_response)
+    respond_with(AUTH_SUCCESS) if challenge_response == "root"
+  else
+    # No challenge response, we're good to go
+    respond_with(AUTH_SUCCESS)
+  end
+end
+
+respond_with(AUTH_FAILURE)
