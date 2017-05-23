@@ -15,6 +15,7 @@
 // Required to use strdup
 #define __EXTENSIONS__
 
+#include <stddef.h>
 #include <errno.h>
 #include <openvpn-plugin.h>
 #include <signal.h>
@@ -22,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 // For consistency in log messages
 #define PLUGIN_NAME "auth-script"
