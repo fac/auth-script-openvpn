@@ -14,6 +14,10 @@ Configure the plugin in your openvpn config, passing the path to the external sc
 
     plugin /path/to/auth_script.so /path/to/external/script.sh
 
+If your script needs aditional arguments you can put them after script path and they will get passed to the script:
+
+    plugin /path/to/auth_script.so /path/to/external/script.sh arg1 arg2
+
 ## External Script requirements
 
 The script used to handle authentication has a very specific set of skills it needs, and if you don't provide those it will hunt you down in silence.

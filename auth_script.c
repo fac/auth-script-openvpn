@@ -30,8 +30,8 @@
 
 // Where we store our own settings/state
 struct plugin_context {
-  const char *script_path;
   plugin_log_t plugin_log;
+  const char *argv[];
 };
 
 void handle_sigchld(int sig)
@@ -50,10 +50,8 @@ deferred_handler(struct plugin_context *context,
 
   int pid;
   struct sigaction sa;
-  char *script_path = strdup(context->script_path);
-  char *argv[] = {script_path, 0};
 
-  log(PLOG_DEBUG, PLUGIN_NAME, "Deferred handler using script_path=%s", script_path);
+  log(PLOG_DEBUG, PLUGIN_NAME, "Deferred handler using script_path=%s", context->argv[0]);
 
   sa.sa_handler = &handle_sigchld;
   sigemptyset(&sa.sa_mask);
@@ -61,7 +59,6 @@ deferred_handler(struct plugin_context *context,
 
   if (sigaction(SIGCHLD, &sa, 0) == -1) {
     log(PLOG_ERR, PLUGIN_NAME, "sigaction call failed");
-    free(script_path);
     return OPENVPN_PLUGIN_FUNC_ERROR;
   }
 
@@ -70,19 +67,17 @@ deferred_handler(struct plugin_context *context,
   if (pid < 0) {
     // parent process, child failed to fork
     log(PLOG_ERR, PLUGIN_NAME, "pid failed < 0 check, got %d", pid);
-    free(script_path);
     return OPENVPN_PLUGIN_FUNC_ERROR;
   }
 
   if (pid > 0) {
     // parent process, child forked successfully
     log(PLOG_DEBUG, PLUGIN_NAME, "child pid is %d", pid);
-    free(script_path);
     return OPENVPN_PLUGIN_FUNC_DEFERRED;
   }
 
   // child process
-  int execret = execve(argv[0], &argv[0], (char *const*)envp);
+  int execret = execve(context->argv[0], (char *const*)&context->argv[0], (char *const*)envp);
   if (-1 == execret) {
     switch(errno) {
       case E2BIG:
@@ -131,7 +126,6 @@ deferred_handler(struct plugin_context *context,
         log(PLOG_ERR, PLUGIN_NAME, "Error trying to exec: unknown, errno: %d", errno);
     }
   }
-  free(script_path);
   exit(127);
 }
 
@@ -164,18 +158,25 @@ openvpn_plugin_open_v3(const int struct_version,
   // Tell OpenVPN we want to handle these calls
   retptr->type_mask = OPENVPN_PLUGIN_MASK(OPENVPN_PLUGIN_AUTH_USER_PASS_VERIFY);
 
+  size_t argvLength = 0;
+  // Start at 1, because we don't care about plugin path
+  for (int i=1; arguments->argv[i]; ++i) {
+    argvLength += strlen(arguments->argv[i]);
+  }
+
   // Plugin init will fail unless we create a handler, so we'll store our
   // script path there as we have to create it anyway.
-  context = (struct plugin_context *) calloc(1, sizeof(struct plugin_context));
+  context = (struct plugin_context *) malloc(sizeof(struct plugin_context) + argvLength);
 
   context->plugin_log = log;
+
+  memcpy(&context->argv, &arguments->argv[1], argvLength);
 
   // Check we've been handed a script path to call
   // This comes directly from openvpn config file:
   //      plugin /path/to/auth.so /path/to/auth/script.sh
   if (arguments->argv[1]) {
-    context->script_path = strdup(arguments->argv[1]);
-    log(PLOG_DEBUG, PLUGIN_NAME, "script_path=%s", context->script_path);
+    log(PLOG_DEBUG, PLUGIN_NAME, "script_path=%s", arguments->argv[1]);
   } else {
     log(PLOG_ERR, PLUGIN_NAME, "ERROR: no script_path specified in config file");
     return OPENVPN_PLUGIN_FUNC_ERROR;
