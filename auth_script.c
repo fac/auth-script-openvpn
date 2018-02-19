@@ -249,5 +249,7 @@ OPENVPN_EXPORT int openvpn_plugin_func_v3(const int struct_version,
 OPENVPN_EXPORT void openvpn_plugin_close_v1(openvpn_plugin_handle_t handle)
 {
         struct plugin_context *context = (struct plugin_context *) handle;
+        /* Safely free all memory allocated for calling the script */
+        free((void*)context->script_path);
         free(context);
 }
