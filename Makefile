@@ -23,11 +23,18 @@ else
 	CFLAGS += -fstack-protector-strong
 endif
 
+$(info Building for $(UNAME_S))
+
+# Output Files
+SRC 	= $(wildcard *.c)
+OUT	= $(SRC:%.c=%.so)
+
+%.so: %.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $<
+
 all: plugin
 
-plugin: auth_script.c
-	$(info Building for $(UNAME_S))
-	$(CC) $(CFLAGS) $(LDFLAGS) -o auth_script.so auth_script.c
+plugin: $(OUT)
 
 clean:
-	rm -f *.o *.so
+	rm -f *.so
