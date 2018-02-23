@@ -35,7 +35,7 @@
 struct plugin_context 
 {
         plugin_log_t plugin_log;
-        const char **argv;
+        const char *argv[];
 };
 
 void handle_sigchld(int sig)
@@ -251,7 +251,7 @@ OPENVPN_EXPORT int openvpn_plugin_func_v3(const int struct_version,
         /* Safeguard on openvpn versions */
         if (struct_version < OPENVPN_PLUGINv3_STRUCTVER) {
                 log(PLOG_ERR, PLUGIN_NAME, 
-                          "ERROR: struct version was older than required");
+                                "ERROR: struct version was older than required");
                 return OPENVPN_PLUGIN_FUNC_ERROR;
         }
 
