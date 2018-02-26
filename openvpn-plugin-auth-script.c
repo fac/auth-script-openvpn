@@ -18,12 +18,12 @@
 #include <stddef.h>
 #include <errno.h>
 #include <openvpn-plugin.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 /********** Constants */
 /* For consistency in log messages */
@@ -38,52 +38,91 @@ struct plugin_context
         const char *argv[];
 };
 
-void handle_sigchld(int sig)
-{
-        (void)sig; /* Squish -Wunused-parameter warning */
-
-        while(waitpid((pid_t)(-1), 0, WNOHANG) > 0) {}
-}
-
 /* Handle an authentication request */
 static int deferred_handler(struct plugin_context *context, 
                 const char *envp[])
 {
         plugin_log_t log = context->plugin_log;
-
-        int pid;
-        struct sigaction sa;
+        pid_t pid;
 
         log(PLOG_DEBUG, PLUGIN_NAME, 
                         "Deferred handler using script_path=%s", 
                         context->argv[SCRIPT_NAME_IDX]);
 
-        sa.sa_handler = &handle_sigchld;
-        sigemptyset(&sa.sa_mask);
-        sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
-
-        if (sigaction(SIGCHLD, &sa, 0) == -1) {
-                log(PLOG_ERR, PLUGIN_NAME, 
-                                "sigaction call failed");
-                return OPENVPN_PLUGIN_FUNC_ERROR;
-        }
-
         pid = fork();
 
-        /* parent process, child failed to fork */
+        /* Parent - child failed to fork */
         if (pid < 0) {
                 log(PLOG_ERR, PLUGIN_NAME, 
                                 "pid failed < 0 check, got %d", pid);
                 return OPENVPN_PLUGIN_FUNC_ERROR;
         }
 
-        /* parent process, child forked successfully */
+        /* Parent - child forked successfully 
+         *
+         * Here we wait until that child completes before notifying OpenVPN of
+         * our status.
+         */
         if (pid > 0) {
+                pid_t wait_rc;
+                int wstatus;
+
                 log(PLOG_DEBUG, PLUGIN_NAME, "child pid is %d", pid);
-                return OPENVPN_PLUGIN_FUNC_DEFERRED;
+                
+                /* Block until the child returns */
+                wait_rc = waitpid(pid, &wstatus, 0);
+
+                /* Values less than 0 indicate no child existed */
+                if (wait_rc < 0) {
+                        log(PLOG_ERR, PLUGIN_NAME,
+                                        "wait failed for pid %d, waitpid got %d",
+                                        pid, wait_rc);
+                        return OPENVPN_PLUGIN_FUNC_ERROR;
+                }
+
+                /* WIFEXITED will be true if the child exited normally, any
+                 * other return indicates an abnormal termination.
+                 */
+                if (WIFEXITED(wstatus)) {
+                        log(PLOG_DEBUG, PLUGIN_NAME, 
+                                        "child pid %d exited with status %d", 
+                                        pid, WEXITSTATUS(wstatus));
+                        return WEXITSTATUS(wstatus);
+                }
+
+                log(PLOG_ERR, PLUGIN_NAME,
+                                "child pid %d terminated abnormally",
+                                pid);
+                return OPENVPN_PLUGIN_FUNC_ERROR;
         }
 
-        /* child process */
+
+        /* Child Control - Spin off our sucessor */
+        pid = fork();
+
+        /* Notify our parent that our child faild to fork */
+        if (pid < 0) 
+                exit(OPENVPN_PLUGIN_FUNC_ERROR);
+        
+        /* Let our parent know that our child is working appropriately */
+        if (pid > 0)
+                exit(OPENVPN_PLUGIN_FUNC_DEFERRED);
+
+        /* Child Spawn - This process actually spawns the script */
+        
+        /* Daemonize */
+        umask(0);
+        setsid();
+
+        /* Close open files and move to root */
+        int chdir_rc = chdir("/");
+        if (chdir_rc < 0)
+                log(PLOG_DEBUG, PLUGIN_NAME,
+                                "Error trying to change pwd to \'/\'");
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+
         int execve_rc = execve(context->argv[0], 
                         (char *const*)context->argv, 
                         (char *const*)envp);
@@ -151,7 +190,7 @@ static int deferred_handler(struct plugin_context *context,
                                                 errno);
                 }
         }
-        exit(127);
+        exit(EXIT_FAILURE);
 }
 
 /* We require OpenVPN Plugin API v3 */
