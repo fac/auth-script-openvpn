@@ -6,13 +6,17 @@ The idea of the plugin is to do as little as possible, and let the external bina
 
 ## Installation
 
-Compile the shared library with `make plugin` and copy `auth_script.so` into your `lib/openvpn/plugins/` folder.
+Compile the shared library with `make plugin` and copy `openvpn-plugin-auth-script.so` into your `lib/openvpn/plugins/` folder.
 
 Copy your external script onto the machine in a sane place, making sure it's executable by the user openvpn is running as.
 
 Configure the plugin in your openvpn config, passing the path to the external script as the second argument:
 
-    plugin /path/to/auth_script.so /path/to/external/script.sh
+    plugin /path/to/openvpn-plugin-auth-script.so /path/to/external/script.sh
+
+The plugin will also pass any strings provided after the script name as arguments to the script execution:
+
+    plugin /path/to/openvpn-plugin-auth-script.so /path/to/external/script.sh arg1 arg2 argN
 
 ## External Script requirements
 
