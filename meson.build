@@ -10,7 +10,8 @@ library(
     'openvpn-plugin-auth-script.c',
     name_prefix: '',
     c_args : [
-        '-I/usr/include/openvpn', # Debian
-        '-I/usr/local/include'    # FreeBSD
+        '-I/usr/include/openvpn',      # Debian
+        '-I/usr/local/include',        # FreeBSD
+        '-I/usr/local/include/openvpn' # OpenBSD
     ]
 )
