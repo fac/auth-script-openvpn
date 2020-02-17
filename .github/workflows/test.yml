@@ -3,7 +3,7 @@ on: [ push, pull_request ]
 jobs:
   ubuntu_trusty:
     runs-on: ubuntu-latest
-    name: Test building for ubuntu trust
+    name: Test building for ubuntu trusty
     steps:
       - name: Checkout
         uses: actions/checkout@v2
