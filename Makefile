@@ -31,7 +31,7 @@ LSB_RELEASE_BIN := $(shell command -v lsb_release 2> /dev/null)
 ifndef LSB_RELEASE_BIN
 $(warning lsb_release is not available on the system, skipping OS detection)
 else
-	ifneq ($(findstring UBUNTU, $(shell lsb_release -si)),)
+	ifneq ($(findstring Ubuntu, $(shell lsb_release -si)),)
 		CFLAGS += -DOS_UBUNTU
 	endif
 endif
