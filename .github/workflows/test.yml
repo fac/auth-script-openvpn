@@ -1,0 +1,21 @@
+name: Test build for common used environments
+on: [ push, pull_request ]
+jobs:
+  ubuntu_trusty:
+    runs-on: ubuntu-latest
+    name: Test building for ubuntu trust
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: build
+        run: docker build -f test/build.Dockerfile --build-arg TAG=trusty -t test:test .
+
+  ubuntu_bionic:
+    runs-on: ubuntu-latest
+    name: Test building for ubuntu bionic
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: build
+        run: docker build -f test/build.Dockerfile --build-arg TAG=bionic -t test:test .
+
