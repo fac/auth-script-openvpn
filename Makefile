@@ -26,7 +26,18 @@ else
 	endif
 endif
 
-$(info Building for $(UNAME_S))
+# Detect Ubuntu to be able to include a different openvpn header file
+LSB_RELEASE_BIN := $(shell command -v lsb_release 2> /dev/null)
+ifndef LSB_RELEASE_BIN
+$(warning lsb_release is not available on the system, skipping OS detection)
+else
+	ifneq ($(findstring UBUNTU, $(shell lsb_release -si)),)
+		CFLAGS += -DOS_UBUNTU
+	endif
+endif
+
+
+$(info Building 4 for $(UNAME_S))
 
 # Output Files
 SRC 	= $(wildcard *.c)

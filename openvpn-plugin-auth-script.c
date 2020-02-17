@@ -17,13 +17,18 @@
 /********** Includes */
 #include <stddef.h>
 #include <errno.h>
-#include <openvpn-plugin.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+
+#ifdef OS_UBUNTU
+#include <openvpn/openvpn-plugin.h>
+#else
+#include <openvpn-plugin.h>
+#endif
 
 /********** Constants */
 /* For consistency in log messages */
