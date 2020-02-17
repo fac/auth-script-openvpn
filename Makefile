@@ -21,7 +21,7 @@ ifeq ($(UNAME_S),FreeBSD)
 	endif
 else
 	STACK_PROTECT := $(shell $(CC) -dumpspecs | grep stack-protector-strong)
-	ifneq ($(filter %stack-protector-strong, $(STACK_PROTECT)),)
+	ifneq ($(findstring fstack-protector-strong, $(STACK_PROTECT)),)
 		CFLAGS += -fstack-protector-strong
 	endif
 endif
