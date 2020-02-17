@@ -20,7 +20,10 @@ ifeq ($(UNAME_S),FreeBSD)
 		CFLAGS += -fstack-protector-strong 
 	endif
 else
-	CFLAGS += -fstack-protector-strong
+	STACK_PROTECT := $(shell $(CC) -dumpspecs | grep stack-protector-strong)
+	ifneq ($(filter %stack-protector-strong, $(STACK_PROTECT)),)
+		CFLAGS += -fstack-protector-strong
+	endif
 endif
 
 $(info Building for $(UNAME_S))
