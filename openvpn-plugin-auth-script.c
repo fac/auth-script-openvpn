@@ -38,6 +38,15 @@ struct plugin_context
         const char *argv[];
 };
 
+void handle_sigchld(int sig)
+{
+    /*
+     * nonblocking wait (WNOHANG) for any child (-1) to come back
+     */
+    (void)(sig); // to skip unused parameter ‘sig‘ error
+    while(waitpid(-1, 0, WNOHANG) > 0) {}
+}
+
 /* Handle an authentication request */
 static int deferred_handler(struct plugin_context *context, 
                 const char *envp[])
@@ -49,148 +58,115 @@ static int deferred_handler(struct plugin_context *context,
                         "Deferred handler using script_path=%s", 
                         context->argv[SCRIPT_NAME_IDX]);
 
-        pid = fork();
+        struct sigaction sa;
 
-        /* Parent - child failed to fork */
-        if (pid < 0) {
-                log(PLOG_ERR, PLUGIN_NAME, 
-                                "pid failed < 0 check, got %d", pid);
-                return OPENVPN_PLUGIN_FUNC_ERROR;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+        sa.sa_handler = &handle_sigchld;
+
+        if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+            return OPENVPN_PLUGIN_FUNC_ERROR;
         }
-
-        /* Parent - child forked successfully 
-         *
-         * Here we wait until that child completes before notifying OpenVPN of
-         * our status.
-         */
-        if (pid > 0) {
-                pid_t wait_rc;
-                int wstatus;
-
-                log(PLOG_DEBUG, PLUGIN_NAME, "child pid is %d", pid);
-                
-                /* Block until the child returns */
-                wait_rc = waitpid(pid, &wstatus, 0);
-
-                /* Values less than 0 indicate no child existed */
-                if (wait_rc < 0) {
-                        log(PLOG_ERR, PLUGIN_NAME,
-                                        "wait failed for pid %d, waitpid got %d",
-                                        pid, wait_rc);
-                        return OPENVPN_PLUGIN_FUNC_ERROR;
-                }
-
-                /* WIFEXITED will be true if the child exited normally, any
-                 * other return indicates an abnormal termination.
-                 */
-                if (WIFEXITED(wstatus)) {
-                        log(PLOG_DEBUG, PLUGIN_NAME, 
-                                        "child pid %d exited with status %d", 
-                                        pid, WEXITSTATUS(wstatus));
-                        return WEXITSTATUS(wstatus);
-                }
-
-                log(PLOG_ERR, PLUGIN_NAME,
-                                "child pid %d terminated abnormally",
-                                pid);
-                return OPENVPN_PLUGIN_FUNC_ERROR;
-        }
-
 
         /* Child Control - Spin off our sucessor */
         pid = fork();
 
-        /* Notify our parent that our child faild to fork */
-        if (pid < 0) 
-                exit(OPENVPN_PLUGIN_FUNC_ERROR);
-        
-        /* Let our parent know that our child is working appropriately */
-        if (pid > 0)
-                exit(OPENVPN_PLUGIN_FUNC_DEFERRED);
+        if (pid < 0) {
+            log(PLOG_ERR, PLUGIN_NAME,
+                "pid failed < 0 check, got %d", pid);
+            return OPENVPN_PLUGIN_FUNC_ERROR;
+        } else if (pid > 0) {
+            /*
+             * We're the parent.  Tell openvpn we're deferring.
+             */
+            return OPENVPN_PLUGIN_FUNC_DEFERRED;
+        } else {
+            /*
+             * We're the child.  Invoke the script.
+             */
 
-        /* Child Spawn - This process actually spawns the script */
-        
-        /* Daemonize */
-        umask(0);
-        setsid();
+            /* Daemonize */
+            umask(0);
+            setsid();
 
-        /* Close open files and move to root */
-        int chdir_rc = chdir("/");
-        if (chdir_rc < 0)
+            /* Close open files and move to root */
+            int chdir_rc = chdir("/");
+            if (chdir_rc < 0)
                 log(PLOG_DEBUG, PLUGIN_NAME,
-                                "Error trying to change pwd to \'/\'");
-        close(STDIN_FILENO);
-        close(STDOUT_FILENO);
-        close(STDERR_FILENO);
+                    "Error trying to change pwd to \'/\'");
+            close(STDIN_FILENO);
+            close(STDOUT_FILENO);
+            close(STDERR_FILENO);
 
-        int execve_rc = execve(context->argv[0], 
-                        (char *const*)context->argv, 
-                        (char *const*)envp);
-        if ( execve_rc == -1 ) {
+            int execve_rc = execve(context->argv[0],
+                                   (char *const*)context->argv,
+                                   (char *const*)envp);
+            if ( execve_rc == -1 ) {
                 switch(errno) {
-                        case E2BIG:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: E2BIG");
-                                break;
-                        case EACCES:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: EACCES");
-                                break;
-                        case EAGAIN:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: EAGAIN");
-                                break;
-                        case EFAULT:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: EFAULT");
-                                break;
-                        case EINTR:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: EINTR");
-                                break;
-                        case EINVAL:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: EINVAL");
-                                break;
-                        case ELOOP:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: ELOOP");
-                                break;
-                        case ENAMETOOLONG:
-                                log(PLOG_DEBUG, PLUGIN_NAME,
-                                                "Error trying to exec: ENAMETOOLONG");
-                                break;
-                        case ENOENT:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: ENOENT");
-                                break;
-                        case ENOEXEC:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: ENOEXEC");
-                                break;
-                        case ENOLINK:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: ENOLINK");
-                                break;
-                        case ENOMEM:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: ENOMEM");
-                                break;
-                        case ENOTDIR:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: ENOTDIR");
-                                break;
-                        case ETXTBSY:
-                                log(PLOG_DEBUG, PLUGIN_NAME, 
-                                                "Error trying to exec: ETXTBSY");
-                                break;
-                        default:
-                                log(PLOG_ERR, PLUGIN_NAME, 
-                                                "Error trying to exec: unknown, errno: %d", 
-                                                errno);
+                    case E2BIG:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: E2BIG");
+                        break;
+                    case EACCES:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: EACCES");
+                        break;
+                    case EAGAIN:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: EAGAIN");
+                        break;
+                    case EFAULT:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: EFAULT");
+                        break;
+                    case EINTR:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: EINTR");
+                        break;
+                    case EINVAL:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: EINVAL");
+                        break;
+                    case ELOOP:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ELOOP");
+                        break;
+                    case ENAMETOOLONG:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ENAMETOOLONG");
+                        break;
+                    case ENOENT:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ENOENT");
+                        break;
+                    case ENOEXEC:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ENOEXEC");
+                        break;
+                    case ENOLINK:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ENOLINK");
+                        break;
+                    case ENOMEM:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ENOMEM");
+                        break;
+                    case ENOTDIR:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ENOTDIR");
+                        break;
+                    case ETXTBSY:
+                        log(PLOG_DEBUG, PLUGIN_NAME,
+                            "Error trying to exec: ETXTBSY");
+                        break;
+                    default:
+                        log(PLOG_ERR, PLUGIN_NAME,
+                            "Error trying to exec: unknown, errno: %d",
+                            errno);
                 }
+            }
+            exit(EXIT_FAILURE);
         }
-        exit(EXIT_FAILURE);
 }
 
 /* We require OpenVPN Plugin API v3 */
