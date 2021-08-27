@@ -6,7 +6,9 @@ The idea of the plugin is to do as little as possible, and let the external bina
 
 ## Installation
 
-Compile the shared library with `make plugin` and copy `openvpn-plugin-auth-script.so` into your `lib/openvpn/plugins/` folder.
+Compile the shared library with `make plugin`. 
+(You will need `openvpn-plugin.h` - on Centos, `yum install openvpn-devel`.
+Copy `openvpn-plugin-auth-script.so` into your `lib/openvpn/plugins/` folder.
 
 Copy your external script onto the machine in a sane place, making sure it's executable by the user openvpn is running as.
 
