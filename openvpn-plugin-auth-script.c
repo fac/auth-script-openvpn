@@ -17,7 +17,7 @@
 /********** Includes */
 #include <stddef.h>
 #include <errno.h>
-#include <openvpn-plugin.h>
+#include <openvpn/openvpn-plugin.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
